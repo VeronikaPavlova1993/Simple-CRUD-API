@@ -1,13 +1,11 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
-import { errorHandler } from '../utils/errorHandler';
-import userRepository from '../repo/repo';
 import userUtils from '../utils/userUtils';
-import { User } from '../types';
-import { uuidv4 } from 'uuid';
+import userService from '../methods/methods';
+import { errorHandler } from '../utils/errorHandler';
 
 const getUsers = (_: IncomingMessage, res: ServerResponse) => {
  try {
-  const users = userRepository.getUsers();
+  const users = userService.getAllUsers();
 
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(users));
@@ -16,35 +14,21 @@ const getUsers = (_: IncomingMessage, res: ServerResponse) => {
  }
 };
 
-const createUser = async (req: IncomingMessage, res: ServerResponse) => {
- const create = (userData: User) => {
-  const { username, age, hobbies } = userData;
-  if (!username || !age || !hobbies) {
-   throw { statusCode: 400, message: 'Missing required fields' };
-  }
-  if (typeof username !== 'string') {
-   throw { statusCode: 400, message: 'Username field must be a string' };
-  }
-  if (typeof age !== 'number') {
-   throw { statusCode: 400, message: 'Age field must be a number' };
-  }
-  if (
-   !Array.isArray(hobbies) ||
-   hobbies.some((hobby) => typeof hobby !== 'string')
-  ) {
-   throw {
-    statusCode: 400,
-    message: 'Hobbies field must be an array of strings',
-   };
-  }
-  const user = { id: uuidv4(), username, age, hobbies };
-  userRepository.create(user);
-  return user;
- };
-
+const getUser = (_: IncomingMessage, res: ServerResponse, userId: string) => {
  try {
-  const userData = await userUtils.userData(req);
-  const user = create(userData);
+  const user = userService.getUserById(userId);
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(user));
+ } catch (error) {
+  errorHandler(res, error);
+ }
+};
+
+const createUser = async (req: IncomingMessage, res: ServerResponse) => {
+ try {
+  const userData = await userUtils.collectUserData(req);
+  const user = userService.createUser(userData);
 
   res.writeHead(201, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(user));
@@ -53,12 +37,43 @@ const createUser = async (req: IncomingMessage, res: ServerResponse) => {
  }
 };
 
+const updateUser = async (
+ req: IncomingMessage,
+ res: ServerResponse,
+ userId: string
+) => {
+ try {
+  const userData = await userUtils.collectUserData(req);
+  const user = userService.updateUser(userData, userId);
 
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(user));
+ } catch (error) {
+  errorHandler(res, error);
+ }
+};
+
+const deleteUser = (
+ _: IncomingMessage,
+ res: ServerResponse,
+ userId: string
+) => {
+ try {
+  userService.deleteUser(userId);
+
+  res.writeHead(204);
+  res.end();
+ } catch (error) {
+  errorHandler(res, error);
+ }
+};
 
 const userController = {
  getUsers,
  getUser,
  createUser,
+ updateUser,
+ deleteUser,
 };
 
 export default userController;
